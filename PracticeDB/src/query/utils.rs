@@ -108,7 +108,7 @@ pub fn parse_sequential(
         }
 
         if page_modified {
-            let schema_path = format!("database/tables/{}.asera", &query.table);
+            let schema_path = format!("database/tables/{}.practice", &query.table);
             let mut write_file = OpenOptions::new()
                 .read(true)
                 .write(true)

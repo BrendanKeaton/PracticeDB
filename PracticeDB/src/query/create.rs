@@ -44,7 +44,7 @@ pub fn create_new_table(query: &mut QueryObject) -> Result<(), String> {
     fs::write(&file_path, json).map_err(|e| format!("Failed to write table file: {}", e))?;
 
     let dir_path_table = "database/tables";
-    let file_path = format!("{}/{}.asera", dir_path_table, table_name);
+    let file_path = format!("{}/{}.practice", dir_path_table, table_name);
     File::create(file_path).map_err(|e| format!("Failed to create database directory: {}", e))?;
 
     Ok(())

@@ -19,7 +19,7 @@ pub fn insert_new_data(query: &mut QueryObject) -> Result<(), String> {
     let schema = get_table_schema(&query.table)?;
     let row_bytes = build_row_byte(&schema, &query.values)?;
     let row_len: u64 = row_bytes.len() as u64;
-    let schema_path = format!("database/tables/{}.asera", &query.table);
+    let schema_path = format!("database/tables/{}.practice", &query.table);
     let file: File = File::open(&schema_path).map_err(|e| e.to_string())?;
     let file_length = file.metadata().map_err(|e| e.to_string())?.len();
 
@@ -147,10 +147,7 @@ fn find_page(
 }
 
 fn insert_page(table_name: &str, page: &Page) -> Result<(), String> {
-    let schema_path = format!("database/tables/{}.asera", table_name);
-
-    // FOR DEBUGGING
-    // println!("new page: {:?}", page);
+    let schema_path = format!("database/tables/{}.practice", table_name);
 
     let mut file = OpenOptions::new()
         .create(true)

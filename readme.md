@@ -1,4 +1,4 @@
-# AseraDB
+# PracticeDB
 
 A SQL database engine built from scratch in Rust. This project implements core database internals — a custom SQL parser, page-based storage engine, row encoding, and an interactive CLI — as a hands-on exploration of how relational databases work under the hood.
 
@@ -19,7 +19,7 @@ A SQL database engine built from scratch in Rust. This project implements core d
 ## Features
 
 - **Custom SQL Parser** — Tokenizes and parses SQL commands without relying on a full SQL grammar engine for execution
-- **Page-Based Storage** — 4096-byte pages with slotted row layout, stored in `.asera` files
+- **Page-Based Storage** — 4096-byte pages with slotted row layout, stored in `.practice` files
 - **Row Encoding/Decoding** — Binary row format with schema-aware type handling
 - **Interactive REPL** — Command-line interface for executing queries in real time
 - **Catalog System** — Table schemas persisted as JSON metadata for validation and lookups
@@ -36,7 +36,7 @@ A SQL database engine built from scratch in Rust. This project implements core d
 ### Build & Run
 
 ```bash
-cd AseraDB
+cd PracticeDB
 cargo run
 ```
 
@@ -108,7 +108,7 @@ src/
     └── utils.rs          # Row encode/decode, page utilities
 ```
 
-**Query pipeline:** Input is tokenized and classified into a `QueryObject`, routed through command-specific parsers, then dispatched to the corresponding execution handler which reads/writes `.asera` data files and JSON catalogs.
+**Query pipeline:** Input is tokenized and classified into a `QueryObject`, routed through command-specific parsers, then dispatched to the corresponding execution handler which reads/writes `.practice` data files and JSON catalogs.
 
 ---
 
@@ -116,7 +116,7 @@ src/
 
 ### Page Layout (4096 bytes)
 
-Each `.asera` file contains one or more fixed-size pages:
+Each `.practice` file contains one or more fixed-size pages:
 
 | Bytes | Field             | Description                                              |
 | ----- | ----------------- | -------------------------------------------------------- |
