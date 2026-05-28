@@ -13,7 +13,7 @@ impl Default for Page {
         Self {
             id: 0,
             data: [0; PAGE_SIZE],
-            dirty: true,
+            dirty: false,
             pin_count: 1,
         }
     }

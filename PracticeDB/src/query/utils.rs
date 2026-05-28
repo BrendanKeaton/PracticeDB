@@ -96,14 +96,21 @@ pub fn parse_sequential(
                 let selected_conditional_column_ids =
                     get_selected_column_ids_in_conditional(query, &schema)?;
                 let should_delete: bool =
-                    should_delete_row(row_bytes, &query, selected_conditional_column_ids)?;
+                    matches_condition(row_bytes, &query, selected_conditional_column_ids)?;
                 if should_delete {
                     delete_row(&mut page_data, row, row_length)?;
                     page_modified = true;
                 }
             } else {
-                decoded_row = decode_row(row_bytes, &schema, &selected_column_ids)?;
-                println!("{:?}", decoded_row);
+                // This is select only (ie, not delete...)
+                let selected_conditional_column_ids =
+                    get_selected_column_ids_in_conditional(query, &schema)?;
+                let should_select: bool =
+                    matches_condition(row_bytes, &query, selected_conditional_column_ids)?;
+                if should_select {
+                    decoded_row = decode_row(row_bytes, &schema, &selected_column_ids)?;
+                    println!("{:?}", decoded_row);
+                }
             }
         }
 
@@ -258,7 +265,7 @@ pub fn delete_row(
     Ok(())
 }
 
-pub fn should_delete_row(
+pub fn matches_condition(
     row_bytes: &[u8],
     query: &QueryObject,
     column_ids: Vec<u8>,

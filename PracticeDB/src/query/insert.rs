@@ -44,8 +44,7 @@ fn build_new_page(
 
     page.data[0] = (file_len / PAGE_SIZE as u64) as u8;
 
-    // TODO guard against 255 row overflow
-    page.data[1] = 1 as u8; // row_count - 1b
+    page.data[1] = 1 as u8; // row_count - 1b (u8 max 255; find_page skips full pages)
 
     let bytes = (row_len as u16).to_le_bytes();
     // len of current rows of data, max ~65k (over a page size, but u8 is too small). This is saved to the "free page offset"
@@ -99,7 +98,9 @@ fn find_page(
                 .map_err(|_| "Corrupt page header")?,
         );
 
-        if space_remaining as u64 >= row_len + PAGE_HEADER_SLOT_SIZE_FOR_ROW {
+        if space_remaining as u64 >= row_len + PAGE_HEADER_SLOT_SIZE_FOR_ROW
+            && page.data[1] < u8::MAX
+        {
             // this section just updates all the bytes in the page accordingly... IE
             // the row count, free space left, adds the row to the back of page, adds slot, etc
             page.pin_count += 1;

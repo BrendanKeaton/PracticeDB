@@ -1,0 +1,20 @@
+{
+  "table_name": "user",
+  "fields": [
+    {
+      "name": "id",
+      "data_type": "I32",
+      "is_indexed": false
+    },
+    {
+      "name": "email",
+      "data_type": "String",
+      "is_indexed": true
+    },
+    {
+      "name": "salary",
+      "data_type": "I32",
+      "is_indexed": false
+    }
+  ]
+}
