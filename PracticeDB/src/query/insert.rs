@@ -19,8 +19,8 @@ pub fn insert_new_data(query: &mut QueryObject) -> Result<(), String> {
     let schema = get_table_schema(&query.table)?;
     let row_bytes = build_row_byte(&schema, &query.values)?;
     let row_len: u64 = row_bytes.len() as u64;
-    let schema_path = format!("database/tables/{}.practice", &query.table);
-    let file: File = File::open(&schema_path).map_err(|e| e.to_string())?;
+    let table_path = format!("database/tables/{}.practice", &query.table);
+    let file: File = File::open(&table_path).map_err(|e| e.to_string())?;
     let file_length = file.metadata().map_err(|e| e.to_string())?.len();
 
     // println!("Inserting row bytes: {:?}", row_bytes); // Test command is : insert profile 1:brendan:24
@@ -148,13 +148,13 @@ fn find_page(
 }
 
 fn insert_page(table_name: &str, page: &Page) -> Result<(), String> {
-    let schema_path = format!("database/tables/{}.practice", table_name);
+    let table_path = format!("database/tables/{}.practice", table_name);
 
     let mut file = OpenOptions::new()
         .create(true)
         .read(true)
         .write(true)
-        .open(&schema_path)
+        .open(&table_path)
         .map_err(|e| e.to_string())?;
 
     let offset = page.id * PAGE_SIZE as u64;

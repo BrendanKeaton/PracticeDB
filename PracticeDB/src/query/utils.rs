@@ -115,11 +115,11 @@ pub fn parse_sequential(
         }
 
         if page_modified {
-            let schema_path = format!("database/tables/{}.practice", &query.table);
+            let table_path = format!("database/tables/{}.practice", &query.table);
             let mut write_file = OpenOptions::new()
                 .read(true)
                 .write(true)
-                .open(&schema_path)
+                .open(&table_path)
                 .map_err(|e| e.to_string())?;
 
             write_file
