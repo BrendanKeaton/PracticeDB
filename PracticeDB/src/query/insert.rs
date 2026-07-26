@@ -44,28 +44,28 @@ fn build_new_page(
 
     page.data[0] = (file_len / PAGE_SIZE as u64) as u8;
 
-    page.data[1] = 1 as u8; // row_count - 1b (u8 max 255; find_page skips full pages)
+    page.data[1..3].copy_from_slice(&1u16.to_le_bytes()); // row_count - 2b
 
     let bytes = (row_len as u16).to_le_bytes();
     // len of current rows of data, max ~65k (over a page size, but u8 is too small). This is saved to the "free page offset"
     // To calculate the next page of offset, you would just take this value, and minus the new
     // rows length
-    page.data[2..4].copy_from_slice(&bytes);
+    page.data[3..5].copy_from_slice(&bytes);
 
     let data_used: u16 = PAGE_HEADER_SIZE_ON_CREATE + row_len as u16;
     let space_remaining: u16 = PAGE_SIZE as u16 - data_used;
-    page.data[4..6].copy_from_slice(&space_remaining.to_le_bytes()); // This is the amount of space remaining.. update on insert / delete
+    page.data[5..7].copy_from_slice(&space_remaining.to_le_bytes()); // This is the amount of space remaining.. update on insert / delete
 
     // This is Last Sequence Number (for WAL recovery)... this needs to be updated as the "actual" value once WAL is created in this repo TODO
-    page.data[6] = 0 as u8;
+    page.data[7..9].copy_from_slice(&0u16.to_le_bytes());
 
     // This is a u16 of the size of the header. Including the row sizes in order
     let page_header_size_with_first_slot = PAGE_HEADER_SIZE_ON_CREATE + 4;
-    page.data[7..9].copy_from_slice(&page_header_size_with_first_slot.to_le_bytes());
+    page.data[9..11].copy_from_slice(&page_header_size_with_first_slot.to_le_bytes());
     let new_row_start = PAGE_SIZE - row_len as usize;
     page.data[new_row_start..PAGE_SIZE].copy_from_slice(row_data);
-    // we arent setting bytes 9-10 or 11-12 for freed space and offset, because they are 0 by default
-    page.data[13..15].copy_from_slice(&(row_len as u16).to_le_bytes());
+    // we arent setting bytes 11-12 or 13-14 for freed space and offset, because they are 0 by default
+    page.data[15..17].copy_from_slice(&(row_len as u16).to_le_bytes());
 
     let _ = insert_page(table_name, &page);
 
@@ -93,23 +93,28 @@ fn find_page(
         file.read_exact(&mut page.data).map_err(|e| e.to_string())?;
 
         let space_remaining = u16::from_le_bytes(
-            page.data[4..6]
+            page.data[5..7]
                 .try_into()
                 .map_err(|_| "Corrupt page header")?,
         );
 
-        if space_remaining as u64 >= row_len + PAGE_HEADER_SLOT_SIZE_FOR_ROW
-            && page.data[1] < u8::MAX
+        let row_count = u16::from_le_bytes(
+            page.data[1..3]
+                .try_into()
+                .map_err(|_| "Corrupt page header")?,
+        );
+
+        if space_remaining as u64 >= row_len + PAGE_HEADER_SLOT_SIZE_FOR_ROW && row_count < u16::MAX
         {
             // this section just updates all the bytes in the page accordingly... IE
             // the row count, free space left, adds the row to the back of page, adds slot, etc
             page.pin_count += 1;
             page.dirty = true;
             page.id = curr_page_id;
-            page.data[1] += 1;
+            page.data[1..3].copy_from_slice(&(row_count + 1).to_le_bytes());
 
             let current_offset = u16::from_le_bytes(
-                page.data[2..4]
+                page.data[3..5]
                     .try_into()
                     .map_err(|_| "Corrupt page header")?,
             );
@@ -118,7 +123,7 @@ fn find_page(
             let end_new_data = start_new_data + row_len as usize;
             page.data[start_new_data..end_new_data].copy_from_slice(&row_bytes);
             let current_header_size = u16::from_le_bytes(
-                page.data[7..9]
+                page.data[9..11]
                     .try_into()
                     .map_err(|_| "Corrupt page header")?,
             );
@@ -127,17 +132,17 @@ fn find_page(
             page.data[slot_start + 2..slot_start + 4]
                 .copy_from_slice(&(row_len as u16).to_le_bytes());
             let new_header_size = current_header_size + PAGE_HEADER_SLOT_SIZE_FOR_ROW as u16;
-            page.data[7..9].copy_from_slice(&new_header_size.to_le_bytes());
+            page.data[9..11].copy_from_slice(&new_header_size.to_le_bytes());
             let new_offset = current_offset + row_len as u16;
-            page.data[2..4].copy_from_slice(&new_offset.to_le_bytes());
+            page.data[3..5].copy_from_slice(&new_offset.to_le_bytes());
             let current_space_remaining = u16::from_le_bytes(
-                page.data[4..6]
+                page.data[5..7]
                     .try_into()
                     .map_err(|_| "Corrupt page header")?,
             );
             let new_space_remaining =
                 current_space_remaining - row_len as u16 - PAGE_HEADER_SLOT_SIZE_FOR_ROW as u16;
-            page.data[4..6].copy_from_slice(&new_space_remaining.to_le_bytes());
+            page.data[5..7].copy_from_slice(&new_space_remaining.to_le_bytes());
 
             let _ = insert_page(table_name, &page);
             return Ok(page);

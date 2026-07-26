@@ -73,10 +73,10 @@ pub fn parse_sequential(
             return Err("Page ID mismatch".to_string());
         }
 
-        let row_count = page_data[1];
+        let row_count = u16::from_le_bytes(page_data[1..3].try_into().unwrap());
 
         for row in (0..row_count).rev() {
-            let curr_slot_offset = row * 4 + 11;
+            let curr_slot_offset = row * 4 + 13;
             let row_offset = u16::from_le_bytes(
                 page_data[curr_slot_offset as usize..(curr_slot_offset as usize + 2)]
                     .try_into()
@@ -234,18 +234,19 @@ pub fn build_row_byte(
 
 pub fn delete_row(
     page_data: &mut [u8; PAGE_SIZE],
-    row_index: u8,
+    row_index: u16,
     row_length: u16,
 ) -> Result<(), String> {
-    page_data[1] -= 1;
+    let row_count = u16::from_le_bytes(page_data[1..3].try_into().unwrap());
+    page_data[1..3].copy_from_slice(&(row_count - 1).to_le_bytes());
 
-    let current_freed = u16::from_le_bytes(page_data[9..11].try_into().unwrap());
+    let current_freed = u16::from_le_bytes(page_data[11..13].try_into().unwrap());
     let new_freed = current_freed + row_length;
-    page_data[9..11].copy_from_slice(&new_freed.to_le_bytes());
+    page_data[11..13].copy_from_slice(&new_freed.to_le_bytes());
 
-    let current_header_size = u16::from_le_bytes(page_data[7..9].try_into().unwrap());
+    let current_header_size = u16::from_le_bytes(page_data[9..11].try_into().unwrap());
 
-    let slot_start = 11 + (row_index as usize) * 4;
+    let slot_start = 13 + (row_index as usize) * 4;
     let slots_end = current_header_size as usize;
 
     if slot_start + 4 < slots_end {
@@ -256,11 +257,11 @@ pub fn delete_row(
     page_data[new_slots_end..slots_end].fill(0);
 
     let new_header_size = current_header_size - PAGE_HEADER_SLOT_SIZE_FOR_ROW as u16;
-    page_data[7..9].copy_from_slice(&new_header_size.to_le_bytes());
+    page_data[9..11].copy_from_slice(&new_header_size.to_le_bytes());
 
-    let current_space = u16::from_le_bytes(page_data[4..6].try_into().unwrap());
+    let current_space = u16::from_le_bytes(page_data[5..7].try_into().unwrap());
     let new_space = current_space + PAGE_HEADER_SLOT_SIZE_FOR_ROW as u16;
-    page_data[4..6].copy_from_slice(&new_space.to_le_bytes());
+    page_data[5..7].copy_from_slice(&new_space.to_le_bytes());
 
     Ok(())
 }
