@@ -1,9 +1,11 @@
+pub mod buffer_pool;
 pub mod conditions_object;
 pub mod field_object;
 pub mod page;
 pub mod query_object;
 pub mod table_metadata;
 
+pub use buffer_pool::BufferPool;
 pub use conditions_object::ConditionsObject;
 pub use field_object::FieldObject;
 pub use page::Page;

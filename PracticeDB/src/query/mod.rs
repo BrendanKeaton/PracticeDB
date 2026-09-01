@@ -4,10 +4,9 @@ pub mod insert;
 pub mod select;
 pub mod utils;
 
-use crate::core::Command;
-use crate::core::QueryObject;
+use crate::core::{BufferPool, Command, QueryObject};
 
-pub fn handle_query(query: &mut QueryObject) -> Result<bool, String> {
+pub fn handle_query(query: &mut QueryObject, buffer_pool: &mut BufferPool) -> Result<bool, String> {
     match query.command {
         Some(Command::SELECT) => {
             let _ = select::read_data(query);

@@ -8,13 +8,14 @@ use query::handle_query;
 use std::io::{self, Write};
 use utils::handle_sql_parsing;
 
-use crate::{core::Command, core::QueryObject};
+use crate::{core::BufferPool, core::Command, core::QueryObject};
 
 fn main() {
-    run();
+    let mut buffer_pool: BufferPool = BufferPool::default();
+    run(&mut buffer_pool);
 }
 
-fn run() {
+fn run(buffer_pool: &mut BufferPool) {
     loop {
         print!("Enter command: ");
         if io::stdout().flush().is_err() {
@@ -31,7 +32,7 @@ fn run() {
                 }
                 if query.command != Some(Command::EXIT) || query.command != None {
                     println!("{}", query);
-                    let _ = handle_query(&mut query);
+                    let _ = handle_query(&mut query, buffer_pool);
                 }
             }
             Err(_) => {
