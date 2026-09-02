@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
+use std::println;
 
 use crate::core::{PAGE_SIZE, Page};
 pub struct BufferPool {
@@ -42,5 +43,21 @@ impl BufferPool {
             self.tables.insert(table_name.to_owned(), new_table_state);
         }
         return Ok(());
+    }
+
+    fn get_page_from_buffer(&mut self, table_name: &str, page_id: u64) -> Result<Page, String> {
+        let key = (table_name.to_owned(), page_id);
+        if !self.pages.contains_key(&(table_name.to_owned(), page_id)) {
+            // The "does it exist" check happens in the function. Just call.
+            let res = self.ensure_table_exists_in_buffer(table_name);
+            if res != Ok(()) {
+                println!("{:?}", &res);
+            }
+        }
+        return self
+            .pages
+            .get_mut(&key)
+            .ok_or_else(|| "page not found".to_string())
+            .cloned();
     }
 }
