@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::println;
 
 use crate::core::{PAGE_SIZE, Page};
@@ -45,19 +46,35 @@ impl BufferPool {
         return Ok(());
     }
 
-    fn get_page_from_buffer(&mut self, table_name: &str, page_id: u64) -> Result<Page, String> {
+    fn get_page_from_buffer(
+        &mut self,
+        table_name: &str,
+        page_id: u64,
+    ) -> Result<&mut Page, String> {
         let key = (table_name.to_owned(), page_id);
-        if !self.pages.contains_key(&(table_name.to_owned(), page_id)) {
-            // The "does it exist" check happens in the function. Just call.
+        if !self.pages.contains_key(&key) {
             let res = self.ensure_table_exists_in_buffer(table_name);
             if res != Ok(()) {
                 println!("{:?}", &res);
             }
+            let table = self
+                .tables
+                .get(table_name)
+                .ok_or_else(|| "ERR: table not found in buffer or on disk.".to_string())?;
+
+            let mut file = &table.file;
+            let mut page: Page = Page::default();
+            file.seek(SeekFrom::Start(page_id * PAGE_SIZE as u64))
+                .map_err(|e| e.to_string())?;
+            file.read_exact(&mut page.data).map_err(|e| e.to_string())?;
         }
-        return self
+
+        self.clock += 1;
+        let curr_page = self
             .pages
             .get_mut(&key)
-            .ok_or_else(|| "page not found".to_string())
-            .cloned();
+            .ok_or_else(|| "ERR: page not found in buffer or on disk".to_string())?;
+        curr_page.last_used = self.clock;
+        return Ok(curr_page);
     }
 }
