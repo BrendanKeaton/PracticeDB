@@ -108,7 +108,6 @@ fn find_page(
         {
             // this section just updates all the bytes in the page accordingly... IE
             // the row count, free space left, adds the row to the back of page, adds slot, etc
-            page.pin_count += 1;
             page.dirty = true;
             page.id = curr_page_id;
             page.data[1..3].copy_from_slice(&(row_count + 1).to_le_bytes());
