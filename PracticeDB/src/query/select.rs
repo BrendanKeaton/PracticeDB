@@ -1,15 +1,11 @@
 use crate::{
-    core::{QueryObject, TableMetadataObject},
+    core::{BufferPool, QueryObject, TableMetadataObject},
     parsing::get_table_schema,
     query::utils::parse_sequential,
 };
-use std::fs::File;
 
-pub fn read_data(query: &mut QueryObject) -> Result<(), String> {
+pub fn read_data(query: &mut QueryObject, buffer_pool: &mut BufferPool) -> Result<(), String> {
     let schema: TableMetadataObject = get_table_schema(&query.table)?;
-    let table_path = format!("database/tables/{}.practice", &query.table);
-    let file: File = File::open(&table_path).map_err(|e| e.to_string())?;
-    let file_length = file.metadata().map_err(|e| e.to_string())?.len();
-    let _ = parse_sequential(query, file, file_length, schema, "select");
+    parse_sequential(query, buffer_pool, schema, "select")?;
     Ok(())
 }

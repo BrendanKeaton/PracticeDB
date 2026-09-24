@@ -8,7 +8,7 @@ use query::handle_query;
 use std::io::{self, Write};
 use utils::handle_sql_parsing;
 
-use crate::{core::BufferPool, core::Command, core::QueryObject};
+use crate::{core::BufferPool, core::QueryObject};
 
 fn main() {
     let mut buffer_pool: BufferPool = BufferPool::default();
@@ -30,9 +30,11 @@ fn run(buffer_pool: &mut BufferPool) {
                 if !(handle_sql_parsing(&cmd.as_str(), &mut query)) {
                     break;
                 }
-                if query.command != Some(Command::EXIT) || query.command != None {
-                    println!("{}", query);
-                    let _ = handle_query(&mut query, buffer_pool);
+                println!("{}", query);
+                match handle_query(&mut query, buffer_pool) {
+                    Ok(true) => {}
+                    Ok(false) => break,
+                    Err(e) => println!("{}", e.red()),
                 }
             }
             Err(_) => {
@@ -40,5 +42,9 @@ fn run(buffer_pool: &mut BufferPool) {
                 continue;
             }
         }
+    }
+
+    if let Err(e) = buffer_pool.flush_all_pages_to_disk() {
+        println!("{}", format!("Failed to flush pages on exit: {}", e).red());
     }
 }

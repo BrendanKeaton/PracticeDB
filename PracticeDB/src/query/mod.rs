@@ -6,20 +6,15 @@ pub mod utils;
 
 use crate::core::{BufferPool, Command, QueryObject};
 
-pub fn handle_query(query: &mut QueryObject, buffer_pool: &mut BufferPool) -> Result<bool, String> {
+pub fn handle_query(
+    query: &mut QueryObject,
+    buffer_pool: &mut BufferPool,
+) -> Result<bool, String> {
     match query.command {
-        Some(Command::SELECT) => {
-            let _ = select::read_data(query);
-        }
-        Some(Command::CREATE) => {
-            let _ = create::create_new_table(query);
-        }
-        Some(Command::INSERT) => {
-            let _ = insert::insert_new_data(query);
-        }
-        Some(Command::DELETE) => {
-            let _ = delete::delete_row_by_condition(query);
-        }
+        Some(Command::SELECT) => select::read_data(query, buffer_pool)?,
+        Some(Command::CREATE) => create::create_new_table(query)?,
+        Some(Command::INSERT) => insert::insert_new_data(query, buffer_pool)?,
+        Some(Command::DELETE) => delete::delete_row_by_condition(query, buffer_pool)?,
         Some(Command::EXIT) => {
             return Ok(false);
         }

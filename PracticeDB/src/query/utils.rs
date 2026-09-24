@@ -1,10 +1,7 @@
-use std::fs::File;
-use std::fs::OpenOptions;
-use std::io::{Read, Seek, SeekFrom, Write};
-
 use crate::core::{
-    ConditionsObject, FieldTypesAllowed, LogicalConnector, Operand, PAGE_HEADER_SLOT_SIZE_FOR_ROW,
-    PAGE_SIZE, QueryObject, TableMetadataObject, ValueTypes, VariableReturn,
+    BufferPool, ConditionsObject, FieldTypesAllowed, LogicalConnector, Operand,
+    PAGE_HEADER_SLOT_SIZE_FOR_ROW, PAGE_SIZE, QueryObject, TableMetadataObject, ValueTypes,
+    VariableReturn,
 };
 
 pub fn get_selected_column_ids(
@@ -52,45 +49,39 @@ pub fn get_selected_column_ids_in_conditional(
 
 pub fn parse_sequential(
     query: &QueryObject,
-    mut file: File,
-    file_len: u64,
+    buffer_pool: &mut BufferPool,
     schema: TableMetadataObject,
     action: &str,
 ) -> Result<(), String> {
-    let mut page_data: [u8; PAGE_SIZE] = [0; PAGE_SIZE];
-    let num_pages: u64 = file_len / PAGE_SIZE as u64;
+    let num_pages: u64 = buffer_pool.page_count(&query.table)?;
 
     let selected_column_ids = get_selected_column_ids(query, &schema)?;
-    let mut page_modified = false;
 
     for curr_page_id in 0..num_pages {
-        file.seek(SeekFrom::Start(curr_page_id * PAGE_SIZE as u64))
-            .map_err(|e| e.to_string())?;
+        let page = buffer_pool.get_page_from_buffer(&query.table, curr_page_id)?;
 
-        file.read_exact(&mut page_data).map_err(|e| e.to_string())?;
-
-        if curr_page_id as u8 != page_data[0] {
+        if curr_page_id as u8 != page.data[0] {
             return Err("Page ID mismatch".to_string());
         }
 
-        let row_count = u16::from_le_bytes(page_data[1..3].try_into().unwrap());
+        let row_count = u16::from_le_bytes(page.data[1..3].try_into().unwrap());
 
         for row in (0..row_count).rev() {
             let curr_slot_offset = row * 4 + 13;
             let row_offset = u16::from_le_bytes(
-                page_data[curr_slot_offset as usize..(curr_slot_offset as usize + 2)]
+                page.data[curr_slot_offset as usize..(curr_slot_offset as usize + 2)]
                     .try_into()
                     .unwrap(),
             );
             let row_length = u16::from_le_bytes(
-                page_data[curr_slot_offset as usize + 2..(curr_slot_offset as usize + 4)]
+                page.data[curr_slot_offset as usize + 2..(curr_slot_offset as usize + 4)]
                     .try_into()
                     .unwrap(),
             );
 
             let row_start = PAGE_SIZE - row_length as usize - row_offset as usize;
             let row_end = row_start + row_length as usize;
-            let row_bytes = &page_data[row_start..row_end];
+            let row_bytes = &page.data[row_start..row_end];
             let decoded_row: Vec<String>;
             if action == "delete" {
                 let selected_conditional_column_ids =
@@ -98,8 +89,8 @@ pub fn parse_sequential(
                 let should_delete: bool =
                     matches_condition(row_bytes, &query, selected_conditional_column_ids)?;
                 if should_delete {
-                    delete_row(&mut page_data, row, row_length)?;
-                    page_modified = true;
+                    delete_row(&mut page.data, row, row_length)?;
+                    page.dirty = true;
                 }
             } else {
                 // This is select only (ie, not delete...)
@@ -112,25 +103,6 @@ pub fn parse_sequential(
                     println!("{:?}", decoded_row);
                 }
             }
-        }
-
-        if page_modified {
-            let table_path = format!("database/tables/{}.practice", &query.table);
-            let mut write_file = OpenOptions::new()
-                .read(true)
-                .write(true)
-                .open(&table_path)
-                .map_err(|e| e.to_string())?;
-
-            write_file
-                .seek(SeekFrom::Start(curr_page_id * PAGE_SIZE as u64))
-                .map_err(|e| e.to_string())?;
-            write_file
-                .write_all(&page_data)
-                .map_err(|e| e.to_string())?;
-            write_file.flush().map_err(|e| e.to_string())?;
-
-            page_modified = false;
         }
     }
 
