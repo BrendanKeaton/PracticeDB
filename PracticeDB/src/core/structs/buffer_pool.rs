@@ -45,15 +45,31 @@ impl BufferPool {
         return Ok(());
     }
 
-    fn flush_page_to_disk(&mut self, table_name: &str, page: Page) -> Result<(), String> {
+    pub fn page_count(&mut self, table_name: &str) -> Result<u64, String> {
+        self.ensure_table_exists_in_buffer(table_name)?;
+
+        let table = self
+            .tables
+            .get(table_name)
+            .ok_or_else(|| "ERR: Table not found by name in system.".to_string())?;
+
+        return Ok(table.next_page_id);
+    }
+
+    fn flush_page_to_disk(
+        &self,
+        table_name: &str,
+        page_id: u64,
+        page: &Page,
+    ) -> Result<(), String> {
         let table_state = self
             .tables
-            .get_mut(table_name)
+            .get(table_name)
             .ok_or_else(|| "ERR: File not found in buffer table.".to_string())?;
 
         let mut file: &File = &table_state.file;
 
-        let offset = page.id * PAGE_SIZE as u64;
+        let offset = page_id * PAGE_SIZE as u64;
 
         file.seek(SeekFrom::Start(offset))
             .map_err(|e| e.to_string())?;
@@ -65,7 +81,19 @@ impl BufferPool {
         Ok(())
     }
 
-    fn evict_page_from_buffer_LRU(&mut self) -> Result<(), String> {
+    pub fn flush_all_pages_to_disk(&mut self) -> Result<(), String> {
+        for (key, page) in &self.pages {
+            if page.dirty {
+                self.flush_page_to_disk(&key.0, key.1, page)?;
+            }
+        }
+        for page in self.pages.values_mut() {
+            page.dirty = false;
+        }
+        return Ok(());
+    }
+
+    fn evict_page_from_buffer_lru(&mut self) -> Result<(), String> {
         let mut oldest_key: (String, u64) = (String::new(), 0);
         let mut oldest_value = self.clock;
         for (key, value) in &self.pages {
@@ -86,7 +114,7 @@ impl BufferPool {
             .ok_or_else(|| "ERR: LRU victim missing from pages".to_string())?;
 
         if removed_page.dirty {
-            self.flush_page_to_disk(&oldest_key.0, removed_page);
+            self.flush_page_to_disk(&oldest_key.0, oldest_key.1, &removed_page)?;
         }
 
         return Ok(());
@@ -117,8 +145,8 @@ impl BufferPool {
                 .map_err(|e| e.to_string())?;
             file.read_exact(&mut page.data).map_err(|e| e.to_string())?;
             page.id = page_id;
-            if !(self.pages.len() < self.capacity) {
-                self.evict_page_from_buffer_LRU();
+            if self.pages.len() >= self.capacity {
+                self.evict_page_from_buffer_lru()?;
             }
             self.pages.insert(key.clone(), page);
         }
@@ -130,5 +158,33 @@ impl BufferPool {
             .ok_or_else(|| "ERR: page not found in buffer or on disk".to_string())?;
         curr_page.last_used = self.clock;
         return Ok(curr_page);
+    }
+
+    pub fn add_new_page(&mut self, table_name: &str) -> Result<&mut Page, String> {
+        self.ensure_table_exists_in_buffer(table_name)?;
+
+        if self.pages.len() >= self.capacity {
+            self.evict_page_from_buffer_lru()?;
+        }
+
+        let curr_table = self
+            .tables
+            .get_mut(table_name)
+            .ok_or_else(|| "ERR: Table not found by name in system.".to_string())?;
+
+        let curr_page_id = curr_table.next_page_id;
+        curr_table.next_page_id += 1;
+
+        let mut page: Page = Page::default();
+        page.id = curr_page_id;
+        page.dirty = true;
+
+        let key = (table_name.to_owned(), curr_page_id);
+        self.pages.insert(key.clone(), page);
+
+        return self
+            .pages
+            .get_mut(&key)
+            .ok_or_else(|| "ERR: newly allocated page missing from pages".to_string());
     }
 }
